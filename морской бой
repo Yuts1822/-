@@ -1,0 +1,161 @@
+import random
+
+
+class Ship:
+    def __init__(self, positions):
+        """
+        Конструктор корабля.
+        positions — список клеток (кортежи), занимаемых кораблем на доске.
+        """
+        self.positions = positions  # Список позиций корабля на доске
+        self.sunk = False  # Флаг, указывающий, затоплен ли корабль
+
+    def hit(self, position):
+        """
+        Метод для попадания по кораблю.
+        Если попадание в одну из позиций корабля, отмечаем, что корабль был поражен.
+        """
+        if position in self.positions:
+            self.positions.remove(position)
+            if not self.positions:
+                self.sunk = True
+            return True
+        return False
+
+    def is_sunk(self):
+        """Проверяет, потоплен ли корабль."""
+        return self.sunk
+
+
+class Board:
+    def __init__(self, size=6):
+        """
+        Инициализация доски.
+        size — размер доски (по умолчанию 6x6).
+        """
+        self.size = size
+        self.board = [['О' for _ in range(size)] for _ in range(size)]
+        self.ships = []  # Список всех кораблей на доске
+        self.shots_fired = set()  # Множество для отслеживания выстрелов
+        self.place_ships()
+
+    def print_board(self, reveal_ships=False):
+        """Выводит доску на экран. Если reveal_ships = True, показывает корабли."""
+        print("  1 2 3 4 5 6")
+        for i in range(self.size):
+            row = f"{i + 1} "
+            for j in range(self.size):
+                cell = self.board[i][j]
+                if cell == '■' and not reveal_ships:
+                    row += 'О '  # Не показывать корабли
+                else:
+                    row += cell + ' '
+            print(row)
+
+    def place_ships(self):
+        """Размещение кораблей на доске. Каждый корабль не должен быть рядом с другим."""
+        ship_sizes = [3, 2, 2, 1, 1, 1, 1]
+        for size in ship_sizes:
+            placed = False
+            while not placed:
+                placed = self.try_place_ship(size)
+
+    def try_place_ship(self, size):
+        """Пытаемся разместить корабль случайным образом."""
+        orientation = random.choice(['H', 'V'])  # Горизонтально или вертикально
+        row = random.randint(0, self.size - 1)
+        col = random.randint(0, self.size - 1)
+
+        # Проверим, влезает ли корабль в данную позицию
+        if orientation == 'H' and col + size <= self.size:
+            positions = [(row, col + i) for i in range(size)]
+        elif orientation == 'V' and row + size <= self.size:
+            positions = [(row + i, col) for i in range(size)]
+        else:
+            return False
+
+        # Проверяем, не перекрываются ли корабли
+        if any(self.board[r][c] == '■' for r, c in positions):
+            return False
+
+        # Размещение корабля
+        for r, c in positions:
+            self.board[r][c] = '■'
+
+        # Создаем объект корабля и добавляем в список
+        self.ships.append(Ship(positions))
+        return True
+
+    def make_shot(self, row, col):
+        """Метод для выстрела. Возвращает 'hit', 'miss', или 'already fired'."""
+        if (row, col) in self.shots_fired:
+            raise ValueError("Вы уже стреляли в эту клетку!")
+
+        self.shots_fired.add((row, col))
+
+        for ship in self.ships:
+            if ship.hit((row, col)):
+                self.board[row][col] = 'X'  # Попадание
+                return 'hit'
+
+        self.board[row][col] = 'T'  # Промах
+        return 'miss'
+
+    def all_ships_sunk(self):
+        """Проверяет, все ли корабли затоплены."""
+        return all(ship.is_sunk() for ship in self.ships)
+
+
+class Game:
+    def __init__(self):
+        """Инициализация игры."""
+        self.player_board = Board()
+        self.ai_board = Board()
+        self.ai_ships_revealed = False
+
+    def player_turn(self):
+        """Ход игрока."""
+        while True:
+            try:
+                row, col = map(int, input("Введите координаты для выстрела (например, 1 2): ").split())
+                if not (1 <= row <= 6 and 1 <= col <= 6):
+                    print("Неверные координаты! Попробуйте снова.")
+                    continue
+                result = self.ai_board.make_shot(row - 1, col - 1)
+                print(f"Результат выстрела: {result}")
+                break
+            except ValueError as e:
+                print(e)
+
+    def ai_turn(self):
+        """Ход компьютера."""
+        while True:
+            row = random.randint(0, 5)
+            col = random.randint(0, 5)
+            if (row, col) not in self.player_board.shots_fired:
+                result = self.player_board.make_shot(row, col)
+                print(f"Компьютер стреляет в клетку ({row + 1}, {col + 1}) — {result}")
+                break
+
+    def play(self):
+        """Основной игровой цикл."""
+        while True:
+            print("Ваше поле:")
+            self.player_board.print_board(reveal_ships=True)
+            print("\nПоле компьютера:")
+            self.ai_board.print_board(reveal_ships=self.ai_ships_revealed)
+
+            # Ход игрока
+            self.player_turn()
+            if self.ai_board.all_ships_sunk():
+                print("Поздравляем! Вы победили!")
+                break
+
+            # Ход компьютера
+            self.ai_turn()
+            if self.player_board.all_ships_sunk():
+                print("Компьютер победил!")
+                break
+if __name__ == "__main__":
+    game = Game()
+    game.play()
